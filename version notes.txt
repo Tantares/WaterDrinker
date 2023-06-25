@@ -1,0 +1,6 @@
+WaterDrinker v0.1
+
+A simplified and lightweight analogue to the basic FireSpitter propeller plane controller, with some example parts.
+Add the "WaterDrinker" folder to your KSP/GameData folder.
+
+MIT
