@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using static WaterDrinker.WDStatics;
 
 namespace WaterDrinker
 {
@@ -12,9 +13,9 @@ namespace WaterDrinker
         Transform highThrottleTransform;
 
         [KSPField]
-        public bool preferMultiMode;
+        public bool preferMultiMode = true;
         [KSPField]
-        public int engineIndex;
+        public int engineIndex = 0;
         [KSPField]
         public string engineName;
         [KSPField]
@@ -23,16 +24,15 @@ namespace WaterDrinker
         public string highThrottleTransformName;
         [KSPField]
         public float lowHighThrottleThreshold;
-        [UI_Toggle(disabledText = "Clockwise", enabledText = "Counter-Clockwise")]
-        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = true, guiName = "Mirror")]
-        public bool IsMirrored;
-
+        [UI_Toggle(disabledText = LOC_WD_MIRROR_FLAG_ENABLED, enabledText = LOC_WD_MIRROR_FLAG_DISABLED)]
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = true, guiName = LOC_WD_MIRROR_FLAG, groupName = WD_GROUP_CODE, groupDisplayName = LOC_WD_GROUP_NAME, groupStartCollapsed = true)]
+        public bool isMirrored;
         [KSPField]
         public string animationName;
         [KSPField]
-        public float baseAnimationSpeed;
+        public float baseAnimationSpeed = 0.01F;
         [KSPField]
-        public float baseAnimationMult;
+        public float baseAnimationMult = 1.0F;
         [KSPField]
         public int animationLayer = 1;
 
@@ -41,7 +41,8 @@ namespace WaterDrinker
         private Animation animation;
         private IEngineStatus engineReference;
 
-        private float animationDirectionMult;
+        private float mirrorDirectionMult;
+        private float reverserDirectionMult;
 
         public override void OnStart(StartState state)
         {
@@ -91,14 +92,14 @@ namespace WaterDrinker
             animation[animationName].normalizedTime = 0f;
             animation[animationName].layer = animationLayer;
 
-            animation.Play();
+            animation.Play(animationName);
 
             // If flipped, reverse the animation.
 
-            animationDirectionMult = (IsMirrored) ? -1.0F : 1.0F;
+            mirrorDirectionMult = (isMirrored) ? -1.0F : 1.0F;
         }
 
-        public void FixedUpdate()
+        public void Update()
         {
             isInFlightScene = HighLogic.LoadedSceneIsFlight;
 
@@ -112,20 +113,29 @@ namespace WaterDrinker
 
             if(!engineReference.isOperational)
             {
-                animation[animationName].speed = 0.0F;
+                if(Mathf.Abs(animation[animationName].speed) >= 0.001F)
+                {
+                    animation[animationName].speed = Mathf.MoveTowards(animation[animationName].speed, 0.0F, Time.deltaTime);
+                }
+                else
+                {
+                    animation[animationName].speed = 0.0F;
+                }
+
                 lowThrottleTransform.gameObject.SetActive(true);
                 highThrottleTransform.gameObject.SetActive(false);
                 return;
             }
 
-            animationDirectionMult = (IsMirrored)
+            mirrorDirectionMult = (isMirrored)
                 ? -1.0F
                 : 1.0F;
 
             // Set the speed of the propeller animation,
             // taking into account the settings, mirroring, and reversers.
 
-            animation[animationName].speed = (baseAnimationSpeed + (engineReference.throttleSetting * baseAnimationMult)) * animationDirectionMult;
+            animation[animationName].speed = (baseAnimationSpeed + (engineReference.throttleSetting * baseAnimationMult))
+                * mirrorDirectionMult; 
 
             isInHighThrottle = engineReference.throttleSetting >= lowHighThrottleThreshold;
 
