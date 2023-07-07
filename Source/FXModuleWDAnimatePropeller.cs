@@ -12,21 +12,32 @@ namespace WaterDrinker
         Transform lowThrottleTransform;
         Transform highThrottleTransform;
 
+        // Engine fields.
+
         [KSPField]
         public bool preferMultiMode = true;
         [KSPField]
         public int engineIndex = 0;
         [KSPField]
         public string engineName;
+
+        // Propeller transform fields.
+
         [KSPField]
         public string lowThrottleTransformName;
         [KSPField]
         public string highThrottleTransformName;
         [KSPField]
         public float lowHighThrottleThreshold;
+
+        // Mirror fields.
+
         [UI_Toggle(disabledText = LOC_WD_MIRROR_FLAG_ENABLED, enabledText = LOC_WD_MIRROR_FLAG_DISABLED)]
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = true, guiName = LOC_WD_MIRROR_FLAG, groupName = WD_GROUP_CODE, groupDisplayName = LOC_WD_GROUP_NAME, groupStartCollapsed = true)]
         public bool isMirrored;
+
+        // Animation fields.
+
         [KSPField]
         public string animationName;
         [KSPField]
@@ -36,10 +47,23 @@ namespace WaterDrinker
         [KSPField]
         public int animationLayer = 1;
 
+        // Reverser fields.
+        [KSPField]
+        public bool isReverserAvailable = false;
+        [KSPField]
+        public string reverserModuleId = string.Empty;
+
+        public float AnimationSpeed
+        {
+            get => animation[animationName].speed;
+            set => animation[animationName].speed = value;
+        }
+
         private bool isInFlightScene;
         private bool isInHighThrottle;
         private Animation animation;
         private IEngineStatus engineReference;
+        private ModuleAnimateGeneric reverserAnimation;
 
         private float mirrorDirectionMult;
         private float reverserDirectionMult;
@@ -97,6 +121,23 @@ namespace WaterDrinker
             // If flipped, reverse the animation.
 
             mirrorDirectionMult = (isMirrored) ? -1.0F : 1.0F;
+
+            // if thrust reverser is available, find it.
+
+            if (isReverserAvailable)
+                InitialiseThrustReverser();
+        }
+
+        private void InitialiseThrustReverser()
+        {
+            reverserAnimation = base.part.Modules
+                .GetModules<ModuleAnimateGeneric>()
+                .First(x => x.moduleID == reverserModuleId);
+
+            if (reverserAnimation == null)
+                isReverserAvailable = false;
+
+            reverserDirectionMult = Mathf.Lerp(1.0F, -1.0F, reverserAnimation.animTime);
         }
 
         public void Update()
@@ -113,13 +154,14 @@ namespace WaterDrinker
 
             if(!engineReference.isOperational)
             {
-                if(Mathf.Abs(animation[animationName].speed) >= 0.001F)
+                if(Mathf.Abs(AnimationSpeed) >= 0.001F)
                 {
-                    animation[animationName].speed = Mathf.MoveTowards(animation[animationName].speed, 0.0F, Time.deltaTime);
+                    AnimationSpeed = Mathf.MoveTowards
+                        (AnimationSpeed, 0.0F, ENGINE_SHUTDOWN_COOLDOWN_MULT * Time.deltaTime);
                 }
                 else
                 {
-                    animation[animationName].speed = 0.0F;
+                    AnimationSpeed = 0.0F;
                 }
 
                 lowThrottleTransform.gameObject.SetActive(true);
@@ -131,11 +173,16 @@ namespace WaterDrinker
                 ? -1.0F
                 : 1.0F;
 
+            reverserDirectionMult = (isReverserAvailable)
+                ? Mathf.Lerp(1.0F, -1.0F, reverserAnimation.animTime)
+                : 1.0F;
+
             // Set the speed of the propeller animation,
             // taking into account the settings, mirroring, and reversers.
 
-            animation[animationName].speed = (baseAnimationSpeed + (engineReference.throttleSetting * baseAnimationMult))
-                * mirrorDirectionMult; 
+            AnimationSpeed = (baseAnimationSpeed + (engineReference.throttleSetting * baseAnimationMult))
+                * mirrorDirectionMult
+                * reverserDirectionMult; 
 
             isInHighThrottle = engineReference.throttleSetting >= lowHighThrottleThreshold;
 

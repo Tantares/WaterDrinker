@@ -9,6 +9,10 @@ namespace WaterDrinker
     {
         public const string WD_GROUP_CODE = "WaterDrinker";
 
+        // Propeller animation.
+
+        public const float ENGINE_SHUTDOWN_COOLDOWN_MULT = 0.1F;
+
         // LOCS
 
         public const string LOC_WD_GROUP_NAME = "#LOC_wd_group_name";                           // WaterDrinker
